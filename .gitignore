@@ -3,3 +3,4 @@ __pycache__/
 *.pyc
 logs/session_*
 models/*.task
+.DS_Store
