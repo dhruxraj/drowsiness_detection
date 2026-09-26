@@ -1,0 +1,12 @@
+# Core (Python 3.9 - 3.12 recommended)
+mediapipe>=0.10.14         # facial landmarks (pulls in opencv-contrib-python)
+opencv-contrib-python>=4.8 # camera, image processing, solvePnP, dashboard
+numpy>=1.24
+PyYAML>=6.0                # config.yaml
+
+# Alarm outputs
+pygame>=2.5                # audible alarm through the speaker (optional, falls back to winsound/bell)
+pyserial>=3.5              # Arduino alarm over USB (optional)
+
+# Raspberry Pi only (install with apt, not pip):
+#   sudo apt install python3-picamera2 python3-gpiozero

@@ -1,0 +1,125 @@
+# =====================================================================
+#  Driver Drowsiness Detection - Configuration / Calibration file
+#  All times are in SECONDS, all angles in DEGREES.
+#  Edit values here instead of changing the source code.
+# =====================================================================
+
+camera:
+  source: 0              # camera index (0 = default webcam) or path/URL of a video file/stream
+  backend: opencv        # opencv | picamera2 (Raspberry Pi camera module)
+  width: 640
+  height: 480
+  fps: 30
+  mirror: true           # flip the DISPLAY horizontally (analysis always uses the raw frame)
+  reconnect_attempts: 5  # re-open the camera this many times if it disconnects
+
+preprocessing:           # helps in poor / uneven lighting
+  clahe: true            # contrast-limited adaptive histogram equalisation
+  clahe_clip_limit: 2.0
+  auto_gamma: true       # brighten very dark frames
+  dark_threshold: 70     # mean brightness (0-255) below which the gamma boost is applied
+
+face_mesh:
+  engine: auto           # auto | legacy | tasks  (see README "MediaPipe versions")
+  task_model_path: models/face_landmarker.task
+  max_num_faces: 2       # the largest (closest) face is treated as the driver
+  refine_landmarks: true
+  min_detection_confidence: 0.5
+  min_tracking_confidence: 0.5
+
+eyes:
+  ear_threshold: 0.21            # EAR below this = eyes closed (used when calibration is off/fails)
+  ear_hysteresis: 0.02           # eyes count as re-opened only above threshold + hysteresis
+  smoothing_alpha: 0.6           # EMA smoothing of EAR (1.0 = no smoothing)
+  blink_max_duration: 0.40       # closures shorter than this are normal blinks (score = 0)
+  long_blink_min_duration: 0.50  # closures longer than this are "long blinks" (fatigue sign)
+  closure_duration_threshold: 1.8   # continuous closure that ON ITS OWN raises the alarm
+  perclos_window: 60             # window for PERCLOS (percentage of eye closure)
+  blink_rate_window: 60          # window for blink-rate calculation
+  low_blink_rate: 6              # blinks/min below this = reduced blinking
+  max_yaw_for_eye_analysis: 30   # beyond this head turn EAR is unreliable -> eye evidence ignored
+
+mouth:
+  mar_threshold: 0.60      # MAR above this = mouth wide open
+  mar_hysteresis: 0.05
+  smoothing_alpha: 0.5
+  yawn_min_duration: 1.5   # mouth must stay open this long to count as a yawn (talking is shorter)
+  yawn_window: 180         # yawns are counted over this window
+
+head:
+  enabled: true
+  pitch_down_threshold: 18          # head tilted down more than this (vs. calibrated neutral) = head drop
+  pitch_hysteresis: 5
+  nod_min_duration: 0.4             # shorter dips are ignored (road bumps, glancing at the dashboard)
+  head_drop_duration_threshold: 2.0 # sustained head drop that ON ITS OWN raises the alarm
+  nod_window: 120                   # nods are counted over this window
+  invert_pitch: false               # set true if "head down" shows as negative pitch on your setup
+  yaw_distraction_threshold: 35     # beyond this state = LOOKING AWAY (never counted as drowsiness)
+
+face_loss:
+  grace_period: 1.0   # dropouts shorter than this are ignored completely
+  warn_after: 5.0     # show "DRIVER NOT VISIBLE" (a warning only - never raises the drowsiness alarm)
+
+calibration:
+  enabled: true
+  duration: 5.0       # look straight ahead with eyes open & mouth closed during this time
+  min_samples: 30
+  ear_ratio: 0.75     # personal closed-eye threshold = ratio x your open-eye EAR
+  ear_min: 0.15
+  ear_max: 0.28
+  mar_margin: 0.40    # personal yawn threshold = max(mouth.mar_threshold, resting MAR + margin)
+
+scoring:
+  # ACUTE components (what is happening right now)
+  eye_closure_weight: 100      # reached when closure lasts closure_duration_threshold
+  head_drop_weight: 100        # reached when head drop lasts head_drop_duration_threshold
+  yawn_in_progress_weight: 10
+  # CUMULATIVE components (fatigue history) - capped by cumulative_cap
+  perclos_weight: 30
+  perclos_low: 0.08            # PERCLOS below this adds nothing
+  perclos_high: 0.30           # PERCLOS at/above this adds the full weight
+  yawn_weight: 15              # per yawn in yawn_window
+  yawn_max_count: 3
+  nod_weight: 15               # per head nod in nod_window
+  nod_max_count: 3
+  long_blink_weight: 8         # per long blink in perclos_window
+  long_blink_max_count: 3
+  low_blink_rate_weight: 10
+  cumulative_cap: 60           # fatigue history alone can never reach the threshold
+  # decision
+  threshold: 100               # total score >= threshold  -> ALARM
+  release_threshold: 40        # acute score must drop below this before the alarm can stop
+  fatigue_warning: 45          # cumulative score >= this -> on-screen "fatigue" advice
+
+alarm:
+  backends: [simulated, audio]  # any of: simulated, audio, gpio, serial
+  min_duration: 3.0   # alarm duration: once on, it sounds at least this long
+  release_time: 1.5   # eyes must stay open (head up) this long before the alarm stops
+  audio:
+    frequency: 2500   # Hz
+    beep_on: 0.25
+    beep_off: 0.15
+    volume: 0.8
+  gpio:               # Raspberry Pi (BCM numbering)
+    pin: 18
+    device: buzzer    # buzzer | relay
+    active_high: true
+    beep_on: 0.25
+    beep_off: 0.15
+  serial:             # Arduino over USB
+    port: /dev/ttyUSB0   # e.g. COM3 on Windows, /dev/ttyACM0 on some Linux boards
+    baudrate: 9600
+
+logging:
+  directory: logs
+  interval: 1.0       # periodic log line every N seconds (plus every state change)
+  csv: true
+  console: true
+
+display:
+  enabled: true
+  window_name: Driver Drowsiness Detection
+  draw_eyes: true
+  draw_mouth: true
+  draw_mesh_points: false
+  panel_width: 270
