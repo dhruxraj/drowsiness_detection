@@ -12,6 +12,14 @@ is detected. It runs in real time on an ordinary laptop or a Raspberry Pi 4/5.
 > occlusion, unusual faces, software faults). Never test it while actually driving; use a
 > desk setup or a parked vehicle. A drowsy driver's only safe response is to stop and rest.
 
+
+
+## Demo
+
+[![Driver Drowsiness Detection Demo](https://img.youtube.com/vi/hiv_c-9GwGY/maxresdefault.jpg)](https://youtu.be/hiv_c-9GwGY)
+
+**Watch the full demonstration:** [YouTube](https://youtu.be/hiv_c-9GwGY)
+
 ---
 
 ## Contents
