@@ -677,3 +677,19 @@ their respective licenses and terms.
 
 *Reminder: this prototype is for learning and demonstration only — it is not a certified
 safety device and must not be the only safety measure in a real vehicle.*
+
+## Author
+
+**Dhruvraj Singh Shekhawat**  
+
+[GitHub](https://github.com/dhruxraj)
+
+## Contributors
+
+Thanks to everyone who has contributed to this project.
+
+<a href="https://github.com/dhruxraj/drowsiness_detection/graphs/contributors">
+
+  <img src="https://contrib.rocks/image?repo=dhruxraj/drowsiness_detection" />
+
+</a>
