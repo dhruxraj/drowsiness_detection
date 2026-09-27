@@ -30,7 +30,9 @@ is detected. It runs in real time on an ordinary laptop or a Raspberry Pi 4/5.
 12. [Flowchart](#12-flowchart)
 13. [Sample output](#13-sample-output)
 14. [Troubleshooting](#14-troubleshooting)
-15. [Future work: CNN / LSTM](#15-future-work-cnn--lstm)
+15. [Limitations and evaluation](#15-limitations-and-evaluation)
+16. [Future work: CNN / LSTM](#16-future-work-cnn--lstm)
+17. [License](#17-license)
 
 ---
 
@@ -41,6 +43,7 @@ drowsiness_detection/
 ├── main.py                     # application entry point (real-time loop)
 ├── config.yaml                 # ALL thresholds and settings (calibration/configuration file)
 ├── requirements.txt
+├── LICENSE
 ├── README.md
 ├── src/
 │   ├── config.py               # YAML loader + validation
@@ -87,7 +90,7 @@ detector for a CNN, or add a new alarm output) without touching the rest.
 |---|---|
 | `camera.py` | Reads frames in a background thread and always returns the newest frame, so processing never lags behind. Video files are read frame-by-frame with the video's own clock, so tests are reproducible. Auto-reconnects. |
 | `preprocessing.py` | Brightens dark frames (gamma) and evens out harsh light (CLAHE on luminance). |
-| `landmark_detector.py` | 478 facial landmarks. If several faces are visible, the largest one (closest to the camera) is the driver. |
+| `landmark_detector.py` | 478 facial landmarks. If several faces are visible, the largest detected face is currently treated as the driver. |
 | `metrics.py` | EAR and MAR from landmark pixel coordinates. |
 | `head_pose.py` | Head pitch/yaw/roll by fitting a generic 3-D face model with `cv2.solvePnP`. |
 | `calibration.py` | 5 s at start-up: learns the driver's open-eye EAR, resting MAR and neutral head pose. |
@@ -97,6 +100,10 @@ detector for a CNN, or add a new alarm output) without touching the rest.
 | `alarm/` | Hardware abstraction: every output implements `on()`, `off()`, `close()`. |
 | `dashboard.py` | Live feed, landmarks, values, score bar, alarm banner, FPS. |
 | `event_logger.py` | Timestamped `.log` and `.csv` files. |
+
+**Current driver-selection limitation:** the system currently selects the largest detected
+face when multiple faces are present. This is suitable for the intended single-driver
+prototype setup but does not guarantee persistent driver identity in a multi-person scene.
 
 ## 3. requirements.txt
 
@@ -108,7 +115,17 @@ PyYAML>=6.0
 pygame>=2.5        # speaker alarm (optional)
 pyserial>=3.5      # Arduino alarm (optional)
 ```
-Raspberry Pi extras come from apt: `python3-picamera2`, `python3-gpiozero`.
+
+Raspberry Pi extras come from apt:
+
+```
+python3-picamera2
+python3-gpiozero
+```
+
+The minimum versions above describe the supported dependency range. For reproducible
+evaluation, record the exact package versions used for the experiment
+(e.g. `pip freeze > requirements-lock.txt`).
 
 ## 4. Installation
 
@@ -121,8 +138,10 @@ cd drowsiness_detection
 
 # 2. create and activate a virtual environment
 python -m venv venv
-# Windows:            venv\Scripts\activate
-# Linux / macOS / Pi: source venv/bin/activate
+# Windows:
+venv\Scripts\activate
+# Linux / macOS / Pi:
+source venv/bin/activate
 
 # 3. install dependencies
 pip install --upgrade pip
@@ -143,22 +162,26 @@ Recent MediaPipe releases removed the old `mp.solutions.face_mesh` API. The proj
 * `face_mesh.engine: auto` (default) uses the old API if it exists, otherwise the new **Tasks API**.
 * The Tasks API needs a small model file. Download it once:
   ```bash
-  python tools/download_model.py      # saves models/face_landmarker.task
+  python tools/download_model.py
   ```
+  This saves `models/face_landmarker.task`.
 * Alternatively install an older MediaPipe that still has `solutions` and needs no model file:
-  `pip install "mediapipe==0.10.14" "numpy<2"`.
+  ```bash
+  pip install "mediapipe==0.10.14" "numpy<2"
+  ```
 
 ### Raspberry Pi 4/5 (64-bit Raspberry Pi OS)
 
 ```bash
 sudo apt update
 sudo apt install -y python3-picamera2 python3-gpiozero python3-venv
-python3 -m venv --system-site-packages venv    # lets the venv see picamera2/gpiozero
+python3 -m venv --system-site-packages venv
 source venv/bin/activate
 pip install -r requirements.txt
 python tools/download_model.py
 python main.py --alarm simulated,gpio
 ```
+
 Use 640×480 (or 480×360) for real-time speed; set `refine_landmarks: false` if FPS is low.
 
 ## 5. Camera setup
@@ -166,12 +189,13 @@ Use 640×480 (or 480×360) for real-time speed; set `refine_landmarks: false` if
 1. **Position**: mount the camera in front of the driver, about 40–80 cm away, at or slightly
    below eye level (dashboard or behind the steering wheel). The whole face, both eyes and
    the mouth must be visible. Avoid steep angles; they distort EAR.
-2. **Find the camera index**: `python tools/test_camera.py` lists working indices and shows
-   the live image with resolution, FPS and brightness. Put the index in `camera.source`.
+2. **Find the camera index**: `python tools/test_camera.py` lists working indices and shows the
+   live image with resolution, FPS and brightness. Put the index in `camera.source`.
 3. **Lighting**: light the face evenly from the front. Avoid a bright window behind the
    driver. The brightness shown by `test_camera.py` should be above ~70. `preprocessing.clahe`
-   and `auto_gamma` compensate for moderate problems. For night use, an **IR camera with IR
-   LEDs (850 nm)** is the standard solution; the landmark detector works on IR images.
+   and `auto_gamma` compensate for moderate problems. For night use, an IR camera with IR
+   LEDs (850 nm) can be considered; performance should still be evaluated under the intended
+   lighting conditions.
 4. **Raspberry Pi camera**: set `camera.backend: picamera2`. Enable the camera in
    `raspi-config` on older OS versions and check it with `rpicam-hello`.
 5. **Recorded video**: `python main.py --source my_test.mp4` is excellent for repeatable demos.
@@ -182,8 +206,13 @@ Use 640×480 (or 480×360) for real-time speed; set `refine_landmarks: false` if
 
 Choose outputs in `config.yaml → alarm.backends` or on the command line
 (`--alarm simulated,audio,gpio,serial`). A backend that is not available is skipped with a
-warning; the **simulated** (console) alarm is always active as a fallback.
-Check any output with `python tools/test_alarm.py --alarm <name>`.
+warning; the **simulated** (console) alarm can be used for development without hardware.
+
+Check any output with:
+
+```bash
+python tools/test_alarm.py --alarm <name>
+```
 
 | Backend | Hardware | Setup |
 |---|---|---|
@@ -192,24 +221,68 @@ Check any output with `python tools/test_alarm.py --alarm <name>`.
 | `gpio` | Raspberry Pi + buzzer or relay | see wiring below; `alarm.gpio.pin` (BCM) |
 | `serial` | Arduino Uno/Nano | upload `hardware/arduino_buzzer/arduino_buzzer.ino`, set `alarm.serial.port` |
 
-**Raspberry Pi – active buzzer (5 V, ≤ 15 mA)**
-```
-GPIO18 (physical pin 12) ──── buzzer (+)
-GND    (physical pin 6)  ──── buzzer (–)
-```
-For louder buzzers use an NPN transistor (2N2222: base via 1 kΩ to GPIO18, emitter to GND,
-buzzer between 5 V and collector). **Relay module** (for an external siren or a vehicle
-alarm input): module VCC → 5 V, GND → GND, IN → GPIO18, set `alarm.gpio.device: relay`
-(set `active_high: false` for active-low modules). Switch vehicle circuits only through the
-relay contacts, with proper fusing — never connect car wiring to the Pi directly.
+### Raspberry Pi – buzzer
 
-**Arduino**: buzzer on D8, relay module on D7, LED on D13. The PC sends `A` (on) and `S` (off)
-at 9600 baud. Port: `COM3`-style on Windows, `/dev/ttyUSB0` or `/dev/ttyACM0` on Linux
-(add your user to the `dialout` group: `sudo usermod -aG dialout $USER`, then log out/in).
+> **Do not connect an unspecified 5 V buzzer directly to a Raspberry Pi GPIO.**
 
-**Adding new hardware** (e.g. CAN bus, vehicle alarm controller): subclass
-`src/alarm/base.py → AlarmBackend`, implement `on()` / `off()`, and register it in
-`src/alarm/manager.py → _make()`.
+For a 5 V buzzer or a higher-current load, use an appropriate transistor/MOSFET driver
+or a suitable relay module so that the GPIO only drives the control input.
+
+Example transistor arrangement:
+
+```
+GPIO18 ── 1 kΩ ──> transistor base/gate
+GND ──────────────> transistor GND/source
+5 V ──────────────> buzzer (+)
+buzzer (-) ───────> transistor collector/drain
+```
+
+Use a component with ratings appropriate for the selected buzzer/load. If using an
+inductive load, provide the appropriate flyback protection.
+
+**Relay module:** module VCC → appropriate supply, GND → GND, IN → GPIO18. Configure
+`alarm.gpio.device: relay` and the correct `active_high` value for the module.
+
+Switch vehicle circuits only through properly rated and fused interfaces. Never connect
+vehicle wiring directly to Raspberry Pi GPIO pins.
+
+### Arduino
+
+Buzzer on D8, relay module on D7, LED on D13.
+
+The PC currently sends, at 9600 baud:
+
+| Command | Meaning |
+|---|---|
+| `A` | alarm on |
+| `S` | alarm off |
+
+Port examples:
+
+```
+Windows: COM3
+Linux:   /dev/ttyUSB0
+         /dev/ttyACM0
+```
+
+On Linux, add your user to the `dialout` group if required, then log out and in again:
+
+```bash
+sudo usermod -aG dialout $USER
+```
+
+**Current communication limitation:** the serial protocol currently does not provide
+command acknowledgements. A future reliability improvement should add acknowledgements
+and connection monitoring so the application can distinguish between a command being sent
+and the physical alarm successfully responding.
+
+### Adding new hardware
+
+For example, CAN bus or another vehicle alarm controller:
+
+1. Subclass `src/alarm/base.py → AlarmBackend`.
+2. Implement `on()` / `off()`.
+3. Register the backend in `src/alarm/manager.py → _make()`.
 
 ## 7. Configuration
 
@@ -219,10 +292,12 @@ Everything is in **`config.yaml`** (commented). The most important calibration v
 |---|---|---|
 | `eyes.ear_threshold` | 0.21 | EAR below this = eyes closed (replaced by calibration) |
 | `eyes.closure_duration_threshold` | 1.8 s | continuous closure that alone raises the alarm |
-| `eyes.blink_max_duration` | 0.4 s | shorter closures are normal blinks, score 0 |
+| `eyes.blink_max_duration` | 0.4 s | shorter closures contribute 0 to the eye-closure score |
+| `eyes.long_blink_min_duration` | 0.5 s | closures at least this long count as long blinks |
 | `mouth.mar_threshold` | 0.60 | MAR above this = mouth wide open |
 | `mouth.yawn_min_duration` | 1.5 s | open this long = yawn (talking is shorter) |
 | `head.pitch_down_threshold` | 18° | head-drop angle relative to neutral |
+| `head.nod_min_duration` | 0.4 s | head dips shorter than this are ignored |
 | `head.head_drop_duration_threshold` | 2.0 s | sustained head drop that alone raises the alarm |
 | `scoring.threshold` | 100 | drowsiness score that triggers the alarm |
 | `alarm.min_duration` | 3.0 s | alarm duration: sounds at least this long |
@@ -235,17 +310,32 @@ at start-up with a clear message.
 
 ## 8. Test procedure
 
-**A. Automated tests (no camera)** — `python -m unittest discover -s tests -t . -v`
-25 tests cover EAR/MAR geometry, head-pose sign convention and every false-alarm requirement
-(normal blinks, brief closure, face-detection failure, looking sideways, small head movements,
-talking) plus detection timing (alarm 1.5–2.1 s after eyes close, stops after recovery,
-no flicker, yawn counting, head drop, combined indicators).
+### A. Automated tests
 
-**B. Logic demo (no camera)** — `python tools/simulate_drive.py` runs a scripted 60 s drive and
-prints the log (see [Sample output](#13-sample-output)).
+```bash
+python -m unittest discover -s tests -t . -v
+```
 
-**C. Live test protocol** — run `python main.py`, calibrate, then perform each step. Record
-the result in a table for your report.
+The current automated test suite covers EAR/MAR geometry, head-pose sign convention and
+detection logic including normal blinks, brief closure, face-detection failure, looking
+sideways, small head movements, talking, detection timing, yawn counting, head drop and
+combined indicators.
+
+These tests validate the behaviour of the implemented logic. They do not by themselves
+establish real-world drowsiness-detection accuracy.
+
+### B. Logic demo
+
+```bash
+python tools/simulate_drive.py
+```
+
+This runs a scripted 60 s drive through the decision logic without requiring a camera.
+
+### C. Live test protocol
+
+Run `python main.py`, calibrate, then perform each step. Record the result in a table for
+your report.
 
 | # | Action | Expected result |
 |---|---|---|
@@ -260,7 +350,7 @@ the result in a table for your report.
 | 9 | Cover the camera for 2 s, then 8 s | `NO FACE` → `DRIVER NOT VISIBLE` warning, no drowsiness alarm |
 | 10 | Let head drop forward for 3 s | `HEAD DROP`, then alarm |
 | 11 | Yawn 3 times, then close eyes 1.3 s | alarm (combined score) although 1.3 s alone does not trigger |
-| 12 | Repeat 1–5 in dim light and with glasses | same behaviour (re-calibrate with **c** if needed) |
+| 12 | Repeat 1–5 in dim light and with glasses | behaviour should be evaluated and documented; re-calibrate with **c** if needed |
 
 Measure **FPS** (dashboard) and **alarm latency** (log timestamps). Open the `.csv` log in
 Excel to plot EAR, MAR and score over time for your report.
@@ -318,41 +408,51 @@ the opposite).
 
 | Indicator | Rule |
 |---|---|
-| Blink | eyes closed < 0.5 s |
+| Blink | eyes closed < 0.5 s (contributes 0 to the eye-closure score if < 0.4 s) |
 | Long blink | eyes closed ≥ 0.5 s (fatigue sign) |
 | Micro-sleep | eyes closed ≥ 1.8 s |
 | PERCLOS | % of time eyes closed during the last 60 s |
 | Reduced blinking | < 6 blinks/min over the last 60 s |
 | Yawn | MAR > threshold for ≥ 1.5 s; counted over 3 min |
-| Head drop / nod | pitch > 18° below neutral for ≥ 0.4 s; counted over 2 min |
+| Head drop / nod | pitch > 18° below neutral for ≥ 0.4 s; counted over 2 min. A drop lasting 2.0 s raises the alarm on its own |
 | Looking away | yaw > 35° → state `LOOKING AWAY`; eye data ignored above 30° |
 
 **Step 3 – score:**
 
 ```
-ACUTE      = Eye closure score  + Head-drop score + Yawn-in-progress score
-             100·clamp((t_closed − 0.4)/(1.8 − 0.4))   100·clamp((t_down − 0.4)/(2.0 − 0.4))   10
-CUMULATIVE = PERCLOS score + 15·yawns + 15·nods + 8·long blinks + 10 (if low blink rate)
+ACUTE      = Eye closure score + Head-drop score + Yawn-in-progress score
+             100·clamp((t_closed − 0.4)/(1.8 − 0.4))
+           + 100·clamp((t_down − 0.4)/(2.0 − 0.4))
+           + 10
+CUMULATIVE = PERCLOS score + 15·yawns + 15·nods
+             + 8·long blinks + 10 (if low blink rate)
              (capped at 60)
 TOTAL      = ACUTE + CUMULATIVE
 ```
 
 **Step 4 – decision:**
+
 * Alarm **ON** when TOTAL ≥ 100.
 * Alarm **OFF** when it has sounded ≥ 3 s, the eyes have been open ≥ 1.5 s, the head is up
   and ACUTE < 40.
 
-**Why this is robust against false alarms**
-* A normal blink contributes **exactly 0** (the eye score starts after 0.4 s of closure).
-* One closed-eye frame can never trigger anything; the alarm needs ~1.8 s of continuous closure.
-* History is capped at 60, so yawning or past blinks can **never trigger the alarm alone** —
-  but a tired driver (e.g. 3 yawns = 45 points) triggers the alarm after only ~1.2 s of closure.
-* Face lost < 1 s → the analysis simply pauses. Face lost longer → ongoing episodes are
-  discarded (a detection failure is never counted as drowsiness) and a "driver not visible"
-  warning is shown instead.
-* Head turned sideways → EAR is geometrically unreliable, so it is ignored.
-* Short head dips (< 0.4 s, road bumps, glancing at the speedometer) are ignored.
-* Separate ON/OFF conditions + minimum alarm duration prevent on/off flicker.
+> **Note:** The exact scoring weights and thresholds are configuration/design choices. Their
+> real-world performance still needs to be evaluated across subjects and conditions.
+
+### Mechanisms used to reduce false alarms
+
+* A normal blink contributes 0 to the eye-closure score because scoring starts after
+  the configured blink duration.
+* One closed-eye frame cannot trigger the alarm; continuous closure is required.
+* History is capped at 60, so yawning or past blinks cannot trigger the alarm by themselves.
+* Face loss does not count as drowsiness. Extended face loss discards ongoing episodes and
+  produces a `DRIVER NOT VISIBLE` warning.
+* Head turned sideways → EAR is treated as unreliable and is ignored.
+* Short head movements below the configured duration are ignored.
+* Separate ON/OFF conditions and minimum alarm duration reduce alarm flicker.
+
+These mechanisms are intended to reduce false alarms; real-world false-alarm performance
+must be established through evaluation.
 
 ## 11. System architecture diagram
 
@@ -442,16 +542,27 @@ Excerpt from `python tools/simulate_drive.py` (scripted drive, same logic as the
 07:48:36 | SIMULATION ENDED | alarms: 2 | blinks: 5 | yawns: 1 | nods: 1
 ```
 
-The live system additionally logs calibration, e.g.
-`CALIBRATION OK (148 samples): open EAR 0.302 -> threshold 0.227; rest MAR 0.04 -> yawn threshold 0.60; neutral pitch +8.4, yaw -2.1`.
-The `.csv` log has columns `timestamp, ear, mar, pitch, yaw, perclos, blink_rate, score, acute, cumulative, state, alarm`.
+The live system additionally logs calibration, for example:
 
-**Dashboard:** live video with face box, eye contours (cyan, orange when closed), EAR/MAR
-points, mouth contour; side panel with coloured state box (ALERT / BLINKING / EYES CLOSED /
+```
+CALIBRATION OK (148 samples): open EAR 0.302 -> threshold 0.227; rest MAR 0.04 -> yawn threshold 0.60; neutral pitch +8.4, yaw -2.1
+```
+
+The `.csv` log has columns:
+
+```
+timestamp, ear, mar, pitch, yaw, perclos, blink_rate,
+score, acute, cumulative, state, alarm
+```
+
+**Dashboard:** live video with face box, landmarks, eye contours (cyan, orange when closed),
+EAR/MAR points, mouth contour; side panel with coloured state box (ALERT / BLINKING / EYES CLOSED /
 YAWNING / HEAD DROP / LOOKING AWAY / NO FACE / DROWSY), EAR and threshold, MAR and threshold,
 pitch/yaw, closure time, PERCLOS, blink rate, counters, score bar with threshold marker,
-alarm status and FPS. During an alarm the frame flashes red with the banner
-`DROWSINESS DETECTED - TAKE A BREAK`.
+alarm status and FPS.
+
+During an alarm the frame flashes red with the banner `DROWSINESS DETECTED - TAKE A BREAK`.
+
 Keys: **q** quit · **c** re-calibrate · **t** test alarm · **r** reset statistics.
 
 ## 14. Troubleshooting
@@ -470,12 +581,62 @@ Keys: **q** quit · **c** re-calibrate · **t** test alarm · **r** reset statis
 | Yawns not counted / talking counted | Adjust `mouth.mar_threshold` using the MAR shown on screen; increase `yawn_min_duration`. |
 | `HEAD DROP` when looking up (or never) | Set `head.invert_pitch: true`; re-calibrate with a neutral head position; adjust `pitch_down_threshold`. |
 | Frequent `NO FACE` | Improve front lighting, keep the full face in view, move closer, lower `min_detection_confidence` to 0.4. |
-| Sunglasses | Eyes cannot be measured through dark lenses; the system relies on yawns and head pose only. IR cameras can see through many sunglasses. |
+| Sunglasses | Eyes cannot be measured reliably through dark lenses; the system relies on yawns and head pose when eye measurements are unavailable. |
 | Arduino not responding | Correct port in config; close the Arduino Serial Monitor (it blocks the port); `dialout` group on Linux; baud rate 9600 in both sketch and config. |
 | GPIO error on Pi | Install `python3-gpiozero`, create the venv with `--system-site-packages`, check BCM pin number and wiring. |
 | Dashboard does not open over SSH | Run `python main.py --no-display` (headless) or use VNC. |
 
-## 15. Future work: CNN / LSTM
+## 15. Limitations and evaluation
+
+The current system is a rule-based driver-monitoring prototype using facial landmarks,
+geometric measurements and temporal thresholds. The automated tests verify that the
+implemented detection logic behaves as designed, but they do not establish general
+drowsiness-detection accuracy across different people and environments.
+
+### Known limitations
+
+* The largest detected face is currently treated as the driver when multiple faces are present.
+* Camera failure and recovery require explicit handling so that the user is not left with a
+  stale monitoring state.
+* The Arduino serial protocol currently does not provide command acknowledgements.
+* Alarm backend activation is not yet equivalent to confirmed physical hardware activation.
+* Dark sunglasses and severe facial occlusion can make eye measurements unreliable.
+* Thresholds and scoring weights require evaluation across different subjects and conditions.
+* Performance can vary with lighting, camera position, frame rate and face orientation.
+
+### Planned evaluation
+
+A real-world evaluation should include labelled recordings from different subjects and
+conditions, including:
+
+* Different people
+* Different lighting conditions
+* With and without glasses
+* Different head positions
+* Different camera distances
+* Normal blinking
+* Eye closure
+* Yawning
+* Head movement
+* Temporary face loss
+
+The following metrics should be recorded:
+
+* False alarms per hour
+* Missed events
+* Alarm trigger latency
+* Measurement/face-loss rate
+* Processing FPS
+* Alarm recovery time
+
+Data used for threshold tuning should be kept separate from the final evaluation data.
+
+The same recordings should also be tested at different processing frame rates where possible
+to verify the FPS-independent temporal analysis.
+
+Results should be reported with the evaluation conditions and limitations clearly documented.
+
+## 16. Future work: CNN / LSTM
 
 The geometric approach is fast and explainable, but thresholds do not suit every face and
 it cannot learn subtle patterns. A learned version could be added step by step:
@@ -489,19 +650,28 @@ it cannot learn subtle patterns. A learned version could be added step by step:
    probability.
 3. **LSTM / GRU / Temporal CNN for drowsiness over time**: input sequences of per-frame
    features (EAR or CNN eye probability, MAR, pitch, yaw, blink durations) over 30–60 s;
-   output a drowsiness level. This learns patterns such as slowing blinks and increasing
-   closure duration *before* a micro-sleep — earlier warnings than fixed rules.
-4. **End-to-end CNN-LSTM** on face-crop sequences, or a 3-D CNN, for the best accuracy if a
-   GPU / accelerator is available.
+   output a drowsiness level. This can learn temporal patterns such as slowing blinks and
+   increasing closure duration before a micro-sleep.
+4. **End-to-end CNN-LSTM** on face-crop sequences, or a 3-D CNN, for a learned temporal model
+   if a suitable GPU / accelerator is available.
 5. **Deployment**: convert to TensorFlow Lite or ONNX, INT8-quantise, and run on a Pi with a
-   Coral TPU / Hailo accelerator or on a Jetson Nano.
+   suitable accelerator or on a Jetson-class device.
 6. **Other improvements**: IR camera + IR illumination for night driving; steering-wheel or
    lane-keeping signals from the vehicle CAN bus fused with vision; per-driver profiles;
    an escalation strategy (visual → sound → seat vibration); a mobile app for trip reports.
 7. **Evaluation**: report accuracy, precision/recall, false-alarm rate per hour and detection
-   latency, using leave-one-subject-out cross-validation so results generalise to new drivers.
+   latency, using leave-one-subject-out cross-validation where the dataset supports it.
 
-Keep the rule-based system as a fallback and safety net even after adding a learned model.
+The current rule-based system should remain available as a transparent baseline for comparison
+with any learned model.
+
+## 17. License
+
+This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for the full
+license text.
+
+Third-party libraries, models, datasets and other external components remain subject to
+their respective licenses and terms.
 
 ---
 
