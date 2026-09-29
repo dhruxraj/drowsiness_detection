@@ -4,3 +4,17 @@ __pycache__/
 logs/session_*
 models/*.task
 .DS_Store
+
+# --- evaluation (issue #4): recordings and derived per-frame traces are personal data ---
+evaluation/dataset/tuning/*
+!evaluation/dataset/tuning/.gitkeep
+evaluation/dataset/final/*
+!evaluation/dataset/final/.gitkeep
+evaluation/results/runs/
+evaluation/**/*.mp4
+evaluation/**/*.avi
+evaluation/**/*.mov
+evaluation/**/*.mkv
+evaluation/**/*.webm
+evaluation/**/*.m4v
+.eval-override-*.yaml

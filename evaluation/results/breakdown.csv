@@ -1,0 +1,7 @@
+scope,group,metric,value,unit,sample_size,status
+(all),(none),positive_events,,count,,TBD — requires real recording
+(all),(none),missed_events,,count,,TBD — requires real recording
+(all),(none),false_alarms_per_hour,,1/h,,TBD — requires real recording
+(all),(none),latency_ms_median,,ms,,TBD — requires real recording
+(all),(none),measurement_unavailable_rate_pct,,% of frames,,TBD — requires real recording
+(all),(none),processing_fps_mean,,frames/s,,TBD — requires real recording

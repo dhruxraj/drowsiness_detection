@@ -1,0 +1,93 @@
+# =====================================================================
+# Evaluation protocol configuration (issue #4: multi-condition evaluation)
+#
+# This file defines HOW the system is evaluated. It does NOT contain detection
+# thresholds - those stay in config.yaml and are frozen with
+# evaluation/scripts/freeze_thresholds.py before the final evaluation.
+# The "matching" and "ground_truth" sections are part of the frozen protocol:
+# changing them after freezing makes evaluate.py --split final refuse to run.
+# All times in SECONDS. Paths are relative to the repository root.
+# =====================================================================
+
+paths:
+  system_config: config.yaml
+  frozen_thresholds: evaluation/config/frozen_thresholds.yaml
+  results_dir: evaluation/results          # official (final, frozen) results only
+  runs_dir: evaluation/results/runs        # every run; git-ignored (derived from recordings)
+  splits:
+    tuning:                                # thresholds may ONLY be chosen with these recordings
+      dataset_dir: evaluation/dataset/tuning
+      recordings: evaluation/labels/tuning_recordings.csv
+      labels: evaluation/labels/tuning_labels.csv
+    final:                                 # held-out subjects; evaluated once, after freezing
+      dataset_dir: evaluation/dataset/final
+      recordings: evaluation/labels/evaluation_recordings.csv
+      labels: evaluation/labels/evaluation_labels.csv
+
+# Allowed values for recording-level conditions and label event types.
+# Extend the lists if you record a new condition; every value is reported separately.
+vocabulary:
+  lighting: [normal_indoor, dim_indoor, bright_frontal, backlit, side_lit, night_ir, daylight_vehicle]
+  glasses: [none, clear, sunglasses]
+  head_position: [frontal, yaw_offset, pitch_offset, varied]   # baseline head pose vs. camera
+  camera_distance: [near, medium, far]                          # near < 50 cm, medium 50-70 cm, far > 70 cm
+  # event_type: allowed alarm_expected values (yes = alarm required, no = alarm must not
+  # occur, ignore = ambiguous, excluded from false-alarm and missed-event counting).
+  # Keep the values QUOTED: unquoted yes/no are parsed as booleans by YAML.
+  event_types:
+    normal: ["no"]                         # explicitly labelled non-event period (optional; unlabelled time is also non-event)
+    blink: ["no"]                          # period of normal, natural blinking
+    eye_closure: ["yes", "no", "ignore"]   # yes = prolonged closure, no = brief closure, ignore = in-between
+    yawn: ["no", "ignore"]                 # by design a yawn alone must not raise the alarm
+    talking: ["no", "ignore"]
+    head_movement: ["no", "ignore"]        # looking sideways/up, glances, small movements
+    head_drop: ["yes", "no", "ignore"]     # yes = sustained head drop, no = brief nod
+    face_loss: ["no", "ignore"]            # face deliberately occluded / out of frame
+    other: ["no", "ignore"]
+
+# Protocol definitions of the ground truth. They are fixed BEFORE tuning and are
+# deliberately independent of the detector thresholds in config.yaml. The loader only
+# warns when a label contradicts them; annotators decide alarm_expected per event.
+ground_truth:
+  prolonged_closure_min_s: 3.0     # scripted "prolonged eye closure" lasts at least this long -> yes
+  brief_closure_max_s: 1.0         # scripted "brief closure" lasts at most this long -> no; in between -> ignore
+  sustained_head_drop_min_s: 3.0   # scripted "sustained head drop" lasts at least this long -> yes
+
+# Event matching (see evaluation/README.md -> "Event matching").
+# An alarm onset detects an alarm-expected event if it lies in
+#   [start - pre_tolerance_s, end + post_tolerance_s].
+matching:
+  pre_tolerance_s: 0.5    # annotated start can be late by a few frames + annotator reaction
+  post_tolerance_s: 1.0   # annotated end can be early; also covers the last frames before eyes re-open
+
+breakdowns:
+  attributes: [subject_id, lighting, glasses, head_position, camera_distance]
+  min_positive_events: 5          # fewer alarm-expected events in a group -> flagged "insufficient data"
+  min_non_event_minutes: 10.0     # less non-event time in a group -> false-alarm rate flagged
+
+recording_checks:
+  max_frame_shortfall_ratio: 0.02   # warn if >2 % fewer frames were processed than the manifest implies
+
+runner:
+  read_timeout_s: 1.0     # Camera.read timeout (same value main.py uses)
+  stall_timeout_s: 15.0   # abort a recording if no frame and no end-of-file for this long
+
+# Supplementary (not an alarm metric): analyzer log messages that indicate the labelled
+# behaviour was recognised. Patterns match the event strings of src/temporal_analyzer.py
+# as shown in the README sample output.
+indicator_events:
+  yawn: ["^YAWN STARTED"]
+  eye_closure: ["^MICROSLEEP", "^LONG BLINK"]
+  head_drop: ["^HEAD DROP"]
+
+tuning:
+  # Selection constraint used by tune.py on the TUNING split. This is a design target
+  # chosen by the maintainer before tuning (not a measured value); review it before use.
+  max_false_alarms_per_hour: 1.0
+  # Dotted config.yaml keys -> candidate values. Only parameters that act after the
+  # per-frame measurements may be listed (the tool rejects camera/preprocessing/face_mesh/
+  # head.invert_pitch/head.enabled because trace replay cannot change measurements).
+  search_space:
+    calibration.ear_ratio: [0.70, 0.75, 0.80]
+    eyes.closure_duration_threshold: [1.5, 1.8, 2.0]
+    head.pitch_down_threshold: [15, 18, 21]

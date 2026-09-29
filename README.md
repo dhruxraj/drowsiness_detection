@@ -85,6 +85,7 @@ drowsiness_detection/
 │   ├── test_metrics.py
 │   ├── test_head_pose.py
 │   └── test_detection_logic.py
+├── evaluation/                 # multi-condition evaluation on labelled recordings (see evaluation/README.md)
 ├── models/                     # face_landmarker.task goes here (Tasks engine only)
 └── logs/                       # session logs are written here
 ```
@@ -362,6 +363,27 @@ your report.
 
 Measure **FPS** (dashboard) and **alarm latency** (log timestamps). Open the `.csv` log in
 Excel to plot EAR, MAR and score over time for your report.
+
+### D. Multi-condition evaluation
+
+The automated tests and the logic demo check that the implemented logic behaves as
+designed; they do not measure real-world performance. The [`evaluation/`](evaluation/README.md)
+folder contains the framework for evaluating the complete system on **labelled recordings**
+of multiple subjects and conditions (lighting, glasses, head position, camera distance)
+covering normal blinking, eye closure, yawning, head movement and temporary face loss.
+Recordings run through the same production pipeline as `python main.py --source <video>`.
+
+```
+python evaluation/scripts/validate_dataset.py --check-files   # labels, consent, tuning/final separation
+python evaluation/scripts/evaluate.py --split tuning           # thresholds are chosen on tuning data only
+python evaluation/scripts/freeze_thresholds.py --selection-method "..."
+python evaluation/scripts/evaluate.py --split final            # held-out subjects, frozen thresholds
+```
+
+It reports false alarms per hour, missed events, alarm trigger latency, measurement/face-loss
+rate and processing FPS, overall and per condition. Recording protocol and label format:
+[evaluation/dataset/README.md](evaluation/dataset/README.md); metric definitions and
+reproduction steps: [evaluation/README.md](evaluation/README.md).
 
 ## 9. EAR and MAR calculations
 
@@ -643,6 +665,33 @@ The same recordings should also be tested at different processing frame rates wh
 to verify the FPS-independent temporal analysis.
 
 Results should be reported with the evaluation conditions and limitations clearly documented.
+
+### Evaluation framework and current status
+
+The planned evaluation above is implemented in [`evaluation/`](evaluation/README.md):
+
+- **Dataset and labels:** a recording script, a manifest per recording (subject, lighting,
+  glasses, head position, camera distance, camera, FPS, resolution, consent) and interval
+  labels for blinking, eye closure, yawning, talking, head movement, head drops and face loss
+  ([evaluation/dataset/README.md](evaluation/dataset/README.md)). Recordings are never committed.
+- **Tuning vs. final data:** separate manifests; the tools reject any subject, recording, file
+  or file content that appears in both. Thresholds stay in `config.yaml`, are selected on
+  tuning data only and are frozen (with fingerprints) before the final evaluation.
+- **Metrics:** false alarms per hour of non-event time, missed events and alarm trigger
+  latency (event-level matching with a documented tolerance), measurement/face-loss rate,
+  processing FPS (distinct from the video FPS), alarm recovery time, and per-condition
+  breakdowns. The same recordings can be re-run at a lower processing frame rate
+  (`--frame-step`) to check the FPS-independent temporal analysis.
+- **Results:** [evaluation/results/report.md](evaluation/results/report.md) and
+  machine-readable `metrics.csv` / `breakdown.csv`.
+
+**Current status: not yet measured.** No labelled recordings have been collected yet, so every
+result is reported as *"Not yet measured — real labelled recordings required"*. Performance
+figures will only be added after real recordings of several subjects have been evaluated with
+thresholds frozen on separate tuning data. The limitations of the evaluation design (acted
+behaviours, desk/parked-vehicle recordings, manual annotation, software alarm decision rather
+than physical alarm output, offline FPS) are documented in
+[evaluation/README.md](evaluation/README.md#limitations).
 
 ## 16. Future work: CNN / LSTM
 
