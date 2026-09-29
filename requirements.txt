@@ -1,6 +1,6 @@
 # Core (Python 3.9 - 3.12 recommended)
-mediapipe>=0.10.14         # facial landmarks (pulls in opencv-contrib-python)
-opencv-contrib-python>=4.8 # camera, image processing, solvePnP, dashboard
+mediapipe==0.10.21         # facial landmarks (pulls in opencv-contrib-python)
+opencv-contrib-python==4.10.0.84 # camera, image processing, solvePnP, dashboard
 numpy>=1.24
 PyYAML>=6.0                # config.yaml
 
