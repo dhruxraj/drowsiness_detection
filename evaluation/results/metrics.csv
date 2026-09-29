@@ -1,0 +1,24 @@
+scope,group,metric,value,unit,sample_size,status
+overall,all,false_alarms_per_hour,,1/h,,TBD — requires real recording
+overall,all,false_alarms,,count,,TBD — requires real recording
+overall,all,false_alarms_per_evaluated_hour,,1/h,,TBD — requires real recording
+overall,all,missed_events,,count,,TBD — requires real recording
+overall,all,detection_rate_pct,,%,,TBD — requires real recording
+overall,all,latency_ms_mean,,ms,,TBD — requires real recording
+overall,all,latency_ms_median,,ms,,TBD — requires real recording
+overall,all,latency_ms_min,,ms,,TBD — requires real recording
+overall,all,latency_ms_max,,ms,,TBD — requires real recording
+overall,all,latency_ms_p90,,ms,,TBD — requires real recording
+overall,all,measurement_unavailable_rate_pct,,% of frames,,TBD — requires real recording
+overall,all,face_missing_rate_pct,,% of frames,,TBD — requires real recording
+overall,all,invalid_measurement_rate_pct,,% of frames,,TBD — requires real recording
+overall,all,unexpected_unavailable_rate_pct,,% of frames,,TBD — requires real recording
+overall,all,measurement_unavailable_time_pct,,% of time,,TBD — requires real recording
+overall,all,recordings_failed,,count,,TBD — requires real recording
+overall,all,recordings_no_face,,count,,TBD — requires real recording
+overall,all,processing_fps_mean,,frames/s,,TBD — requires real recording
+overall,all,processing_fps_median,,frames/s,,TBD — requires real recording
+overall,all,processing_fps_p5,,frames/s,,TBD — requires real recording
+overall,all,processing_fps_min_recording,,frames/s,,TBD — requires real recording
+overall,all,end_to_end_fps,,frames/s,,TBD — requires real recording
+overall,all,source_fps_median,,frames/s,,TBD — requires real recording
